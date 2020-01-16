@@ -13,12 +13,13 @@
 #include <chrono>
 #include <thread>
 #include <atomic>
-
+#include <mutex>
 
 using namespace std;
 
 #define _XOPEN_SOURCE
 
+mutex g_mutex;
 
 namespace MessageType {
     const int REQUEST = 0;
@@ -143,7 +144,7 @@ int main(int argc, char* argv[]) {
     thread worker(criticalWorker);
 
     while (!theEnd) {
-        printState(&self);
+        // printState(&self);
         auto msg = receiveMessage();
         cout << self.pid << " received message";
         switch (msg.type) {
