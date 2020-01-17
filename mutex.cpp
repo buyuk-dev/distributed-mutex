@@ -19,7 +19,19 @@ using namespace std;
 
 #define _XOPEN_SOURCE
 
-mutex g_mutex;
+struct Logger {
+    Logger(ostream& stream) : stream(stream) {}
+
+    template<typename T>
+    Logger& operator<<(const T& value) { 
+        lock_guard<mutex> guard(loggerMutex);
+        stream << value;
+        return *this;
+    }
+
+    mutex loggerMutex;
+    ostream& stream;
+} log(cout);
 
 namespace MessageType {
     const int REQUEST = 0;
@@ -41,9 +53,9 @@ struct ProcessInfo {
 
 
 void sendMessage(int type, int destination, int content = -1) {
-    cout << self.pid << " is sending "
+    log  << self.pid << " is sending "
          << (type == MessageType::TOKEN ? "token" : "request")
-         << " message to " << destination << endl;
+         << " message to " << destination << "\n";
     Message msg { type, content };
     MPI_Send(&msg, MSG_SIZE, MPI_INT, destination, type, MPI_COMM_WORLD);
 }
@@ -97,14 +109,14 @@ void CRITICAL_SECTION(const ProcessInfo* const proc) {
     using namespace chrono_literals;
 
     requestAccess();
-    cout << self.pid << " is waiting for access." << endl;    
+    log << self.pid << " is waiting for access." << "\n";    
     while (!self.token || !self.requesting) {
     }
 
-    cout << "Process " << proc->pid << " has entered." << endl;
+    log << "Process " << proc->pid << " has entered." << "\n";
     this_thread::sleep_for(1s);
 
-    cout << "Process " << proc->pid << " is leaving." << endl;
+    log << "Process " << proc->pid << " is leaving." << "\n";
     releaseAccess();
 }
 
@@ -118,11 +130,11 @@ void criticalWorker() {
 
 
 void printState(const ProcessInfo* const proc) {
-    cerr << "[ " << proc->pid << " ]\n"
-         << " - token: " << (proc->token ? 1 : 0) << endl
-         << " - requesting: " << (proc->requesting ? 1 : 0) << endl
-         << " - father: " << proc->father << endl
-         << " - next: " << proc->next << endl;
+    log << "[ " << proc->pid << " ]\n"
+         << " - token: " << (proc->token ? 1 : 0) << "\n"
+         << " - requesting: " << (proc->requesting ? 1 : 0) << "\n"
+         << " - father: " << proc->father << "\n"
+         << " - next: " << proc->next << "\n";
 }
 
 
@@ -144,16 +156,15 @@ int main(int argc, char* argv[]) {
     thread worker(criticalWorker);
 
     while (!theEnd) {
-        // printState(&self);
         auto msg = receiveMessage();
-        cout << self.pid << " received message";
+        log << self.pid << " received message";
         switch (msg.type) {
         case MessageType::REQUEST:
-            cout << " <REQUEST> from " << msg.from << endl;
+            log << " <REQUEST> from " << msg.from << "\n";
             requestReceived(msg);
             break;
         case MessageType::TOKEN:
-            cout << " <TOKEN> from " << msg.from << endl;
+            log << " <TOKEN> from " << msg.from << "\n";
             self.token = true;
             break;
         }
